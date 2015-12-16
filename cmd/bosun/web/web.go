@@ -32,6 +32,8 @@ var (
 	indexTemplate func() *template.Template
 	router        = mux.NewRouter()
 	schedule      = sched.DefaultSched
+	hostAPIJSON   []byte
+	hostAPIErr    error
 )
 
 const (
@@ -70,6 +72,16 @@ func Listen(listenAddr string, devMode bool, tsdbHost string) error {
 		}
 		return templates
 	}
+	go func() {
+		for {
+			var hd map[string]*sched.HostData
+			hd, hostAPIErr = schedule.Host("")
+			if hostAPIErr == nil {
+				hostAPIJSON, hostAPIErr = json.Marshal(hd)
+			}
+			<-time.After(15 * time.Second)
+		}
+	}()
 
 	if !devMode {
 		tpl := indexTemplate()
@@ -93,7 +105,7 @@ func Listen(listenAddr string, devMode bool, tsdbHost string) error {
 	router.Handle("/api/expr", JSON(Expr))
 	router.Handle("/api/graph", JSON(Graph))
 	router.Handle("/api/health", JSON(HealthCheck))
-	router.Handle("/api/host", JSON(Host))
+	router.HandleFunc("/api/host", Host)
 	router.Handle("/api/last", JSON(Last))
 	router.Handle("/api/incidents", JSON(Incidents))
 	router.Handle("/api/incidents/events", JSON(IncidentEvents))
@@ -604,8 +616,21 @@ func APIRedirect(w http.ResponseWriter, req *http.Request) {
 	http.Redirect(w, req, "http://bosun.org/api.html", 302)
 }
 
-func Host(t miniprofiler.Timer, w http.ResponseWriter, r *http.Request) (interface{}, error) {
-	return schedule.Host(r.FormValue("filter"))
+func Host(w http.ResponseWriter, r *http.Request)  {
+	if hostAPIErr != nil {
+		serveError(w, hostAPIErr)
+	}
+	var tw io.Writer = w
+	if strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
+		w.Header().Set("Content-Encoding", "gzip")
+		gz := gzip.NewWriter(w)
+		defer gz.Close()
+		tw = gz
+	}
+	w.Header().Add("Content-Type", "application/json")
+	if _, err := tw.Write(hostAPIJSON); err != nil {
+		serveError(w, err)
+	}
 }
 
 // Last returns the most recent datapoint for a metric+tagset. The metric+tagset
