@@ -11,6 +11,8 @@ import (
 	"bosun.org/metadata"
 	"bosun.org/opentsdb"
 	"bosun.org/slog"
+    
+    "bosun.org/ntlm"
 )
 
 func queuer() {
@@ -90,7 +92,8 @@ func sendBatch(batch []*opentsdb.DataPoint) {
 		return
 	}
 	now := time.Now()
-	resp, err := SendDataPoints(batch, tsdbURL)
+    slog.Info("Send data points. NtlmAuth=", ntlmAuth)
+	resp, err := SendDataPoints(batch, tsdbURL, ntlmAuth)
 	if err == nil {
 		defer resp.Body.Close()
 	}
@@ -137,7 +140,8 @@ func recordSent(num int) {
 	slock.Unlock()
 }
 
-func SendDataPoints(dps []*opentsdb.DataPoint, tsdb string) (*http.Response, error) {
+func SendDataPoints(dps []*opentsdb.DataPoint, tsdb string, ntlmAuth bool) (*http.Response, error) {
+	
 	var buf bytes.Buffer
 	g := gzip.NewWriter(&buf)
 	if err := json.NewEncoder(g).Encode(dps); err != nil {
@@ -153,6 +157,18 @@ func SendDataPoints(dps []*opentsdb.DataPoint, tsdb string) (*http.Response, err
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Content-Encoding", "gzip")
 	Add("collect.post.total_bytes", Tags, int64(buf.Len()))
-	resp, err := client.Do(req)
+	
+    if ntlmAuth {
+       return doNtlmHttpRequest(req)
+    } 
+    
+    resp, err := client.Do(req)
 	return resp, err
+}
+
+func doNtlmHttpRequest(req *http.Request) (*http.Response, error) {
+     
+    username := "..."
+    password := "..."
+    return ntlm.DoNTLMRequest(client, req, username, password, true)
 }

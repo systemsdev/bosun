@@ -41,7 +41,8 @@ var (
 	flagVersion         = flag.Bool("version", false, "Prints the version and exits.")
 	flagConf            = flag.String("conf", "", "Location of configuration file. Defaults to scollector.toml in directory of the scollector executable.")
 	flagToToml          = flag.String("totoml", "", "Location of destination toml file to convert. Reads from value of -conf.")
-
+    flagNtlm            = flag.Bool("ntlm", false, "Specifies to use NTLM authentication.")
+    
 	mains []func()
 )
 
@@ -63,8 +64,12 @@ func main() {
 		m()
 	}
 	conf := readConf()
-	if *flagHost != "" {
+    if *flagHost != "" {
 		conf.Host = *flagHost
+	}
+    if *flagNtlm {
+		fmt.Println("Using NTLM authentication")
+        conf.Ntlm = *flagNtlm
 	}
 	if *flagFilter != "" {
 		conf.Filter = strings.Split(*flagFilter, ",")
@@ -212,7 +217,7 @@ func main() {
 	if u != nil {
 		slog.Infoln("OpenTSDB host:", u)
 	}
-	if err := collect.InitChan(u, "scollector", cdp); err != nil {
+	if err := collect.InitChan(u, conf.Ntlm, "scollector", cdp); err != nil {
 		slog.Fatal(err)
 	}
 	if version.VersionDate != "" {

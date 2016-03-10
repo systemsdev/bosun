@@ -52,6 +52,7 @@ var (
 
 	tchan               chan *opentsdb.DataPoint
 	tsdbURL             string
+    ntlmAuth            bool
 	osHostname          string
 	metricRoot          string
 	queue               []*opentsdb.DataPoint
@@ -99,7 +100,7 @@ func (t *timeoutTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 
 // InitChan is similar to Init, but uses the given channel instead of creating a
 // new one.
-func InitChan(tsdbhost *url.URL, root string, ch chan *opentsdb.DataPoint) error {
+func InitChan(tsdbhost *url.URL, isNtlm bool, root string, ch chan *opentsdb.DataPoint) error {
 	if tchan != nil {
 		return fmt.Errorf("cannot init twice")
 	}
@@ -114,6 +115,7 @@ func InitChan(tsdbhost *url.URL, root string, ch chan *opentsdb.DataPoint) error
 		u.Host = "localhost" + u.Host
 	}
 	tsdbURL = u.String()
+    ntlmAuth = isNtlm
 	metricRoot = root + "."
 	tchan = ch
 	go queuer()
@@ -182,8 +184,8 @@ func InitChan(tsdbhost *url.URL, root string, ch chan *opentsdb.DataPoint) error
 
 // Init sets up the channels and the queue for sending data to OpenTSDB. It also
 // sets up the basename for all metrics.
-func Init(tsdbhost *url.URL, root string) error {
-	return InitChan(tsdbhost, root, make(chan *opentsdb.DataPoint))
+func Init(tsdbhost *url.URL, isNtlm bool, root string) error {
+	return InitChan(tsdbhost, isNtlm, root, make(chan *opentsdb.DataPoint))
 }
 
 func SetHostname(host string) error {
