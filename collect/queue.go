@@ -168,7 +168,8 @@ func SendDataPoints(dps []*opentsdb.DataPoint, tsdb string, ntlmAuth bool) (*htt
 
 func doNtlmHttpRequest(req *http.Request) (*http.Response, error) {
      
-    username := "..."
-    password := "..."
+    //use default credentials - authenticate via sspi
+    username := ""
+    password := ""
     return ntlm.DoNTLMRequest(client, req, username, password, true)
 }
